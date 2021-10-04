@@ -1,0 +1,46 @@
+## Bayesian model for generating priors for fecundity and density-dependent parameters from abattoir data, with ##four alternative density-dependent functions. 
+
+model {
+
+  for(i in 1:N){
+ 
+      ow_m[i]~dpois(theta*mustar_m[i])            #observed male worms
+      uw_m[i]~dpois((1-theta)*mustar_m[i])    #unobserved male worms
+      
+      ow_f[i]~dpois(theta*mustar_f[i])                 #observed female worms
+      uw_f[i]~dpois((1-theta)*mustar_f[i])         #unobserved female worms
+      
+      m_w[i]<-ow_m[i]+uw_m[i]                           #true count male worms
+      f_w[i]<-ow_f[i]+uw_f[i]                                  #true count female worms
+      
+      w[i]<-m_w[i]+f_w[i]                                        #True overall worm count
+     mustar_m[i]<-rho[i]*mu_w*(1-q)    #mu_w is mean worm burden accross population
+     mustar_f[i]<-rho[i]*mu_w*q              #q is proportion female
+      
+      rho[i]~dgamma(k,k)                      #k is aggregation parameter for negative binomial 
+                      
+      t_c[i]<- ifelse(f_w[i]<m_w[i], f_w[i], m_w[i]) #true number of couples
+    
+      om[i] ~ dpois(ee[i]*g[i])        #om is observed miracidia for individual i
+
+#Alternative functions for density-dependence#
+#a is per couple per gram fecundity, b is dd parameter for all functions #
+
+# Model 1 power relationship proportional to total worms
+ee[i] <- a*(t_c[i])*w[i]^b       
+
+#Model 2 power relationship proportional to total couples
+#ee[i] <- a*(t_c[i])*t_c[i]^b    
+
+#Model 3 exponential relationship proportional to total worms
+#dd_w[i]<-ifelse(w[i]==0,0,w[i]-1) 
+#ee[i] <- a*(t_c[i])*exp(dd_w[i]*b)   
+
+#Model 4 exponential relationship proportional to total couples
+#dd_w[i]<-ifelse(t_c[i]==0,0,t_c[i]-1) 
+#ee[i] <- a*(t_c[i])*exp(dd_w[i]*b)   
+
+}
+       #Specify priors here
+
+}

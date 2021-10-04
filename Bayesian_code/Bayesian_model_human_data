@@ -1,0 +1,152 @@
+## Bayesian model for estimation of mean worm burden by genotype and dispersion parameter from human survey data. 
+
+model {
+
+  for(i in 1:N){
+     
+                               ########## ESTIMATING WORM DISTRIBUTION BY GENOTYPE ##########
+                                                                  # 5 worm genotypes distinguished # 
+                               
+    w_sh[i] ~dpois(mustar_sh[i]) # Distribution of each worm genotype separately, sh=S. haematobium
+    w_sb[i] ~dpois(mustar_sb[i]) # S. bovis
+    w_F1a[i] ~dpois(mustar_F1a[i]) # F1a, this is defined as F1 product of Female S. bovis and Male S.     
+                                                                                                                                                                           haematobium
+    w_F1b[i] ~dpois(mustar_F1b[i]) # F1b, this is defined F1 product of Female S. haematobium and Male      
+         										S. bovis
+    w_hyb[i] ~dpois(mustar_hyb[i]) # Later generation hybrid worms
+    
+    
+    mustar_sh[i]<- rho[i]*mu_w_sh     # mu_w_j  is mean worm burden across population for each genotype, 
+    mustar_hyb[i]<- rho[i]*mu_w_hyb   # Later generation hybrid
+    mustar_F1a[i]<- rho[i]*mu_w_F1a   # F1a 
+    mustar_F1b[i]<- rho[i]*mu_w_F1b   # F1b 
+    mustar_sb[i]<- rho[i]*mu_w_sb         # S. bovis
+    
+   rho[i]~dgamma(k,k) #k is aggregation parameter for negative binomia
+    
+###NOTE k and therefore rho is assumed to be the same for all genotype distributions ###
+    
+### Number of male and female worms for each of the 5 distinguished genotypes are binomial ###
+# samples from each genotype worm population with probability based on assumed constant sex ratio q #
+    
+    f_w_sh[i]~ dbinom(q_sh,w_sh[i])   # female sh
+    m_w_sh[i] <- w_sh[i]-f_w_sh[i]       # male sh
+      
+    f_w_hyb[i] ~ dbinom(q_hyb,w_hyb[i]) #female Hyb
+    m_w_hyb[i] <- w_hyb[i]-f_w_hyb[i]      #male Hyb
+    
+    f_w_F1a[i] ~ dbinom(q_F1a,w_F1a[i])  #female F1a
+    m_w_F1a[i] <- w_F1a[i]- f_w_F1a[i]       #male F1a
+    
+    f_w_F1b[i] ~ dbinom(q_F1b,w_F1b[i])  #female F1b
+    m_w_F1b[i] <- w_F1b[i]- f_w_F1b[i]       #male F1b
+   
+    f_w_sb[i] ~ dbinom(q_sb,w_sb[i])     #female sb
+    m_w_sb[i] <- w_sb[i]- f_w_sb[i]         #male sb
+    
+    
+    t_w[i]<-w_sh[i]+w_hyb[i]+w_F1a[i]+w_F1b[i]+w_sb[i] # Total worms all genotypes
+    
+ dd_w[i]<- ifelse(t_w[i]==0,0,t_w[i]-1) # dd effect is considered to be proportional to total worms-1 as per A&M 
+    
+            ###NUMBER OF COUPLES: 7 different pairing possibilities distinguished, in each host ###
+  
+#HAEMATOBIUM PAIRS. Assume Sh Males preferentially choose female Sh, but that female #
+# Sh “available” are those not mated by males or Sb or F1b- these are "spare"  sh females  #
+    
+    tc_sh[i]<- ifelse(f_w_sh_spare[i]<m_w_sh[i], f_w_sh_spare[i], m_w_sh[i]) #total number of couples of sh 
+    
+    m_w_sh_nsh[i] <- m_w_sh[i]-tc_sh[i]  # number of sh males not paired with sh female
+
+  
+#HYBRID1 PAIRINGS: hyb x hyb or hyb Female x sh Male. Assume Male sh prefers Female sh #
+# so only male sh not mated with Female sh available here #
+
+     tc_hyb1[i]<- tc_hybF_shM[i]+tc_hyb_hyb[i] # 2 possible combinations not distinguished in the data
+    
+     tc_hybF_shM[i]<- ifelse(f_w_hyb[i]<m_w_sh_nsh[i], f_w_hyb[i], m_w_sh_nsh[i]) # Male sh not mated   
+     with Female sh, dominant over male hyb and will mate with female hybrids first
+    
+     f_w_hyb_nsh[i]<- f_w_hyb[i]- tc_hybF_shM[i] #female hybrids not mated with sh therefore available to   
+     mate with hyb males
+    
+     tc_hyb_hyb[i]<- ifelse(f_w_hyb_nsh[i]<m_w_hyb[i], f_w_hyb_nsh[i], m_w_hyb[i]) # Male hyb then mate     
+     with female hybrids which are not mated with sh
+    
+    m_w_sh_nsh_nhyb[i] <- m_w_sh_nsh[i]-tc_hybF_shM[i] #Male sh not mated with sh or hyb therefore    
+    available for interspecies/early backcrosses below
+    
+#HYBRID2 PAIRS- 2 types, sb Female x sh Male (F1a) or F1a Female x sh Male (F1a Backcross)#
+# Assume here latter is first as these are the majority of the miracidia seen #
+    
+    tc_F1aF_shM[i]<- ifelse(f_w_F1a[i]<m_w_sh_nsh_nhyb[i], f_w_F1a[i], m_w_sh_nsh_nhyb[i]) # Number of Hybrid2 backcrosses, corresponds to F1a Female mated with sh Males that have not already paired with Sh females or hybrid females
+
+    m_w_sh_spare[i]<- m_w_sh_nsh_nhyb[i]- tc_F1aF_shM[i] #number of sh males unmated with sh, hyb or F1a hybrids. 
+    
+    tc_sbF_shM[i] <- ifelse(f_w_sb[i]<m_w_sh_spare[i], f_w_sb[i], m_w_sh_spare[i]) ## This corresponds to an F1a type initial cross-species pairing between sbF female and shmale, assuming this is the shmales last resort..
+  
+     
+# HYBRID3 PAIRS- 2 types, sh Female x sb Male (F1b), sh Female x F1b Male (F1b Backcross) #
+#Assume here latter is  dominant, and he has first choice of female sh, then sb male has those left over# 
+ #(as this corresponds to the majority of miracidia of this type being backcrosses), and then the #
+# remaining sh females are "spare" and can mate with sh males #
+    
+    tc_shF_F1bM[i]<- ifelse(f_w_sh[i]<m_w_F1b[i], f_w_sh[i], m_w_F1b[i]) # Number of hybrid3 type pairings- backcrosses, corresponds to F1b males and sh females, assumes dominance of F1b males
+    
+    f_w_sh_nbackcross[i]<- f_w_sh[i]- tc_shF_F1bM[i] ## number of sh females unmated F1b hybrids. 
+    
+    tc_shF_sbM[i] <- ifelse(f_w_sh_nbackcross[i]<m_w_sb[i], f_w_sh_nbackcross[i], m_w_sb[i]) # This corresponds to an F1b type initial cross-species pairing between sh Female and sb Male
+    
+    f_w_sh_spare[i]<- f_w_sh_nbackcross[i]-tc_shF_sbM[i] # These spare females are then available for sh males
+  
+    
+# Observed eggs , a poisson with mean= expected eggs #
+
+ oe[i] ~ dpois(ee[i])  # DATA #overall egg count
+     
+#Observed miracidia genotype count data #
+
+om[i,1:6] ~ dmulti(p_geno[i,1:6],Nm[i])     # DATA # om[i,] is a vector of the number of obeserved miracidia in each genotype 1:6 for each individual
+
+## probalities that a sampled miracidia of host [i] is in each genotype - based on relative proportions of expected ee genotypes in host [i]
+
+     p_geno[i,1] <- ifelse(oe[i]==0,0,ee_sh[i]/ee[i])
+     
+     p_geno[i,2] <- ifelse(oe[i]==0,0,ee_Hyb1[i]/ee[i]) 
+    
+     p_geno[i,3] <- ifelse(oe[i]==0,0,ee_F1a[i]/ee[i]) 
+     
+     p_geno[i,4] <- ifelse(oe[i]==0,0,ee_F1a_backcross[i]/ee[i] )
+     
+     p_geno[i,5] <- ifelse(oe[i]==0,0,ee_F1b[i]/ee[i] ) 
+     
+     p_geno[i,6] <- ifelse(oe[i]==0,0,ee_F1b_backcross[i]/ee[i])
+
+    # Expected egg count, density-dependent mean (for poisson) based on exponential relationship #
+    
+    
+     ee[i] <- ee_sh[i] + ee_hyb1[i] + ee_F1a[i] + ee_F1a_backcross[i] + ee_F1b[i] + ee_F1b_backcross[i] 
+
+     ee_sh[i] <- a*tc_sh[i]*(exp(dd_w[i]*b)) # expected sh eggs/miracida per 10ml sample
+    
+    ee_hyb1[i]<-ee_hybF_shM[i]+ ee_hyb_hyb[i] # expected Hybrid1 eggs/miracidia per sample- 2 possible     
+    combinations below:
+    
+    ee_hybF_shM[i]<- a*tc_hybF_shM[i]*(exp(dd_w[i]*b)) 
+
+    ee_hyb_hyb[i]<- a*tc_hyb_hyb[i]*(exp(dd_w[i]*b))
+
+    ee_F1a[i]<- a*tc_sbF_shM[i]*(exp(dd_w[i]*b)) # expected eggs F1a type
+    
+    ee_F1a_backcross[i]<- a*tc_F1aF_shM[i]*(exp(dd_w[i]*b)) # expected eggs F1a backcross
+    
+    ee_F1b[i]<- a*tc_shF_sbM[i]*(exp(dd_w[i]*b)) # expected eggs F1b type
+    
+    ee_F1b_backcross[i]<- a*tc_shF_F1bM[i]*(exp(dd_w[i]*b)) # expected eggs F1b backcross
+
+    
+}
+# Specify priors here
+    
+    
+}    

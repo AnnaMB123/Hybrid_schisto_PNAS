@@ -1,0 +1,40 @@
+## Bayesian model for estimation of mean worm burden and dispersion parameters from live animal data.
+
+model {
+  
+for(i in 1:N){
+  
+w[i]~ dpois(mustar[i]) # true worm burden w of individual i, population-level negative binomial defined     
+                       #via gamma/poisson
+   mustar[i]<-rho[i]*mu_w  # mu_w is mean worm burden accross population
+   rho[i]~dgamma(k,k)     #k is aggregation parameter for negative binomial
+
+  f_w[i]~ dbinom(q,w[i])   #number of female worms for each host				                      
+  m_w[i] <- w[i]-f_w[i]           #number of male worms
+  t_c[i]<- ifelse(f_w[i]<m_w[i], f_w[i], m_w[i]) #total number of couples
+  pair_pos[i] <- ifelse(t_c[i]>0,1,0) # pair positive if at least one worm of each sex 
+
+#If positive for any test must have at least 1 pair. 
+#Probability dependent sensitivity of KK and MHT tests, SeKK and SeMHT     
+
+      p1[i]~dbern((SeKK*SeMHT+covDp)*pair_pos[i]) #Data, slide+ & hatch+
+      p2[i]~dbern((SeKK*(1-SeMHT)-covDp)*pair_pos[i]) #Data, slide+ hatch-
+      p3[i]~dbern(((1-SeKK)*SeMHT-covDp)*pair_pos[i]) #Data, slide- hatch+
+      p4[i] <-1- (p1[i] +p2[i] +p3[i]) 
+    
+    
+     om[i] ~ dpois(mustar_e[i])     # data- om is observed miracidia per sample for host i 
+                                     
+     mustar_e[i] <- ee[i]          #ee is expected egg count per sample. 
+    
+     dd_w[i]<-ifelse(w[i]==0,0,w[i]-1) ### Make dd effect proportional to total worms 
+     ee[i] <- a*t_c[i]*exp(dd_w[i]*b)*g[i] #expected eggs per sample of size g grams.
+
+ #a is per female per g fecundity
+ #b is dd reduction
+        
+    
+}
+# Specify priors here
+    
+}    
